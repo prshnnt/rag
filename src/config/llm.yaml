@@ -1,0 +1,28 @@
+provider: anthropic  # anthropic | openai | gemini | local
+
+anthropic:
+  api_key_env: ANTHROPIC_API_KEY
+  model: claude-sonnet-4-20250514
+  max_tokens: 2000
+
+openai:
+  api_key_env: OPENAI_API_KEY
+  model: gpt-4.1-mini
+  max_tokens: 2000
+
+gemini:
+  api_key_env: GEMINI_API_KEY
+  model: gemini-1.5-pro
+  max_tokens: 2000
+
+local:
+  backend: ollama
+  model: llama3.1
+  base_url: http://localhost:11434
+
+provider: groq
+
+groq:
+  api_key_env: GROQ_API_KEY
+  model: llama-3.1-70b-versatile
+  max_tokens: 2000
