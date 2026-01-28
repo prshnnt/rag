@@ -6,7 +6,7 @@ NO chunking logic - just raw text extraction for prototyping.
 import sys
 from pathlib import Path
 import json
-from typing import Dict, List
+from typing import Dict
 from datetime import datetime
 import pypdf
 from loguru import logger
