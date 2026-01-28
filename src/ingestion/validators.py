@@ -6,8 +6,6 @@ Validators for legal content and chunks.
 Ensures all legal data meets strict quality and completeness standards.
 """
 
-import re
-from typing import Dict, List, Optional
 from loguru import logger
 
 # Import required types and registry
