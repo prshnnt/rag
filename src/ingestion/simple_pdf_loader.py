@@ -25,13 +25,13 @@ class SimplePDFLoader:
     
     # PDF filename mapping
     PDF_FILES = {
-        "constitution": "constitution_of_india.pdf",
-        "bns": "bharatiya_nyaya_sanhita_2023.pdf",
-        # "bnss": "bharatiya_nagarik_suraksha_sanhita_2023.pdf",
-        # "ipc": "indian_penal_code_1860.pdf",
-        # "crpc": "code_criminal_procedure_1973.pdf",
-        # "cpc": "code_civil_procedure_1908.pdf",
-        # "it_act": "information_technology_act_2000.pdf",
+        "constitution": "constitution_of_india.pdf", #s
+        "bns": "bharatiya_nyaya_sanhita_2023.pdf", #
+        # "bnss": "bharatiya_nagarik_suraksha_sanhita_2023.pdf", #
+        # "ipc": "indian_penal_code_1860.pdf", 
+        # "crpc": "code_criminal_procedure_1973.pdf", 
+        # "cpc": "code_civil_procedure_1908.pdf", 
+        # "it_act": "information_technology_act_2000.pdf", #
     }
     
     def __init__(self, pdf_dir: Path, output_dir: Path):
