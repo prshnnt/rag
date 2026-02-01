@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # ----------------------------
     # LLM Provider Selection
     # ----------------------------
-    llm_provider: Literal["groq", "anthropic", "openai", "gemini", "local"] = "anthropic"
+    llm_provider: Literal["groq", "anthropic", "openai", "gemini", "local"] = "groq"
 
     # ----------------------------
     # API Keys (OPTIONAL)
