@@ -41,15 +41,15 @@ class LegalRAGWorkflow:
         workflow.add_node("retrieve", self._retrieve_node)
         workflow.add_node("rerank", self._rerank_node)
         workflow.add_node("generate", self._generate_node)
-        workflow.add_node("validate", self._validate_node)
+        # workflow.add_node("validate", self._validate_node)
         
         # Define edges
         workflow.set_entry_point("classify_intent")
         workflow.add_edge("classify_intent", "retrieve")
         workflow.add_edge("retrieve", "rerank")
         workflow.add_edge("rerank", "generate")
-        workflow.add_edge("generate", "validate")
-        workflow.add_edge("validate", END)
+        workflow.add_edge("generate", END)
+        # workflow.add_edge("validate", END)
         
         return workflow.compile()
     
@@ -58,7 +58,7 @@ class LegalRAGWorkflow:
         try:
             logger.info(f"Classifying query: {state['query']}")
             intent = self.intent_classifier.classify(state['query'])
-            state['intent'] = intent.dict()
+            state['intent'] = intent.model_dump()
             logger.info(f"Detected domain: {intent.domain}, law: {intent.law_type}")
         except Exception as e:
             logger.error(f"Intent classification error: {e}")
