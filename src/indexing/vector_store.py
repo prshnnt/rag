@@ -27,7 +27,7 @@ class VectorStore:
             # Create searchable text
             search_text = f"{chunk.title or ''} {chunk.text} {chunk.proviso or ''}"
             texts.append(search_text)
-            self.metadata.append(chunk.dict())
+            self.metadata.append(chunk.model_dump())
         
         # Generate embeddings
         embeddings = self.model.encode(texts, convert_to_numpy=True)
