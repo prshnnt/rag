@@ -1,5 +1,6 @@
 import json
-from langchain.docstore.document import Document
+import uuid
+from core.chunker import LegalChunk
 from indexing.vector_store import VectorStore
 
 def process_legal_json(json_file_path):
@@ -7,29 +8,26 @@ def process_legal_json(json_file_path):
     with open(json_file_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
 
-    documents = []
+    chunks = []
 
-    # 2. Iterate through each point in the Adhiniyam
+    # 2. Convert JSON items to LegalChunk objects
     for item in data:
-        # Create a self-contained string for embedding
-        # This ensures the vector 'knows' the context even without metadata
-        page_content = f"Act: {item['act']}\nChapter: {item['chapter']}\nSection: {item['section']}\nContent: {item['content']}"
+        chunk = LegalChunk(
+            law_name=item['act'],
+            chapter_title=item['chapter'],
+            identifier_number=str(item['section']),
+            text=item['content'],
+            chunk_id=str(uuid.uuid4())
+        )
+        if chunk.validate_completeness():
+            chunks.append(chunk)
 
-        # Store structured metadata for precise filtering during RAG
-        metadata = {
-            "chapter": item['chapter'],
-            "section": item['section'],
-            "act": item['act']
-        }
-
-        doc = Document(page_content=page_content, metadata=metadata)
-        documents.append(doc)
-
-    # 3. Store in ChromaDB using your updated vectorstore.py
-    print(f"Loading {len(documents)} sections into ChromaDB...")
-    vector_db = VectorStore()
-    vector_db.add_chunks(documents=documents)
-    print("Vector database created and persisted successfully.")
+    # 3. Store in ChromaDB
+    print(f"Loading {len(chunks)} chunks into ChromaDB...")
+    vdb = VectorStore(persist_directory="./legal_chroma_db")
+    vdb.add_chunks(chunks)
+    print("Database updated successfully.")
 
 if __name__ == "__main__":
+    # Ensure you have your 'adhiniyam_data.json' ready
     process_legal_json("adhiniyam_data.json")

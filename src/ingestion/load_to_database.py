@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List
 from loguru import logger
 
-from simple_pdf_loader import SimplePDFLoader
+from ingestion.simple_pdf_loader import SimplePDFLoader
 
 
 class LegalDocumentDB:
