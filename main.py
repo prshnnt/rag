@@ -42,6 +42,12 @@ def main():
     # Load settings
     settings = Settings()
     
+    if args.dry_run:
+        logger.info("DRY RUN MODE - No changes will be made")
+        laws = args.laws or [code for code, info in SUPPORTED_LAWS.items() if info.get("active")]
+        logger.info(f"Would process: {', '.join(laws)}")
+        return
+
     # Check if indices already exist
     index_dir = Path(settings.index_dir)
     if (index_dir / "faiss.index").exists() and not args.rebuild:
@@ -50,12 +56,6 @@ def main():
         if response.lower() != 'y':
             logger.info("Aborted.")
             return
-    
-    if args.dry_run:
-        logger.info("DRY RUN MODE - No changes will be made")
-        laws = args.laws or [code for code, info in SUPPORTED_LAWS.items() if info.get("active")]
-        logger.info(f"Would process: {', '.join(laws)}")
-        return
     
     # Build indices
     builder = IndexBuilder(settings)

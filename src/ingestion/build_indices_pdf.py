@@ -1,111 +1,100 @@
-
-# ----------------------------------------------------------------------------
-# MAIN SCRIPT
-# ----------------------------------------------------------------------------
-
 from pathlib import Path
+from typing import List, Optional
+import uuid
+from tqdm import tqdm
 from loguru import logger
 
-from ingestion.load_to_database import LegalDocumentDB
+from config.settings import Settings
 from ingestion.simple_pdf_loader import SimplePDFLoader
+from indexing.vector_store import VectorStore
+from core.chunker import LegalChunk
 
+class IndexBuilder:
+    """Builds FAISS indices from PDF Documents."""
+    
+    def __init__(self, settings: Settings):
+        self.settings = settings
+        self.vector_store = VectorStore(embedding_model=settings.embedding_model)
+        self.pdf_dir = Path("data/pdfs") # Default, could be configurable
+        self.index_dir = Path(settings.index_dir)
+        self.index_dir.mkdir(parents=True, exist_ok=True)
 
-def main():
-    """Main entry point for loading PDFs to database."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(
-        description="Load PDFs to database (no chunking)"
-    )
-    parser.add_argument(
-        "--pdf-dir",
-        type=Path,
-        default=Path("data/pdfs"),
-        help="Directory containing PDF files"
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=Path("data/database"),
-        help="Output directory for database"
-    )
-    parser.add_argument(
-        "--format",
-        choices=["json", "sqlite", "both"],
-        default="both",
-        help="Output format (default: both)"
-    )
-    parser.add_argument(
-        "--list",
-        action="store_true",
-        help="List documents in database and exit"
-    )
-    
-    args = parser.parse_args()
-    
-    # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # List mode
-    if args.list:
-        db_path = args.output_dir / "legal_docs.db"
-        if not db_path.exists():
-            print("Database not found. Run without --list to create it.")
+    def build_all(self, laws: Optional[List[str]] = None):
+        """
+        Build indices for specified laws or all available PDFs.
+        
+        Args:
+            laws: List of law codes (filenames without extension) to process.
+                  If None, process all found PDFs.
+        """
+        logger.info("Initializing PDF Loader...")
+        # Create a temporary output dir for the loader if needed, or use processed data dir
+        loader_output = Path(self.settings.processed_data_dir)
+        loader = SimplePDFLoader(self.pdf_dir, loader_output)
+        
+        logger.info("Loading PDFs...")
+        documents = loader.load_all_pdfs()
+        
+        if not documents:
+            logger.warning("No PDF documents found to index.")
             return
-        
-        db = LegalDocumentDB(db_path)
-        docs = db.list_documents()
-        
-        print("\n" + "="*60)
-        print("Documents in Database:")
-        print("="*60)
-        for doc in docs:
-            print(f"{doc['law_code']:12} | {doc['total_pages']:3} pages | {doc['filename']}")
-        print("="*60)
-        
-        db.close()
-        return
-    
-    # Load PDFs
-    loader = SimplePDFLoader(args.pdf_dir, args.output_dir)
-    documents = loader.load_all_pdfs()
-    
-    if not documents:
-        logger.error("No documents loaded. Check PDF directory.")
-        return
-    
-    # Save to JSON
-    if args.format in ["json", "both"]:
-        logger.info("\n" + "="*60)
-        logger.info("Saving to JSON format...")
-        logger.info("="*60)
-        
-        loader.save_to_json(documents)
-        loader.save_individual_files(documents)
-    
-    # Save to SQLite
-    if args.format in ["sqlite", "both"]:
-        logger.info("\n" + "="*60)
-        logger.info("Saving to SQLite database...")
-        logger.info("="*60)
-        
-        db_path = args.output_dir / "legal_docs.db"
-        db = LegalDocumentDB(db_path)
-        db.insert_all(documents)
-        
-        # Show summary
-        docs = db.list_documents()
-        logger.success(f"\n✓ Database created with {len(docs)} documents")
-        
-        db.close()
-    
-    logger.success("\n" + "="*60)
-    logger.success("LOADING COMPLETE!")
-    logger.success("="*60)
-    logger.success(f"Output directory: {args.output_dir}")
-    logger.success(f"Total documents: {len(documents)}")
 
+        all_chunks = []
+        
+        logger.info(f"Processing {len(documents)} documents...")
+        for law_code, doc_data in documents.items():
+            if laws and law_code not in laws:
+                continue
+                
+            logger.info(f"Chunking {law_code}...")
+            chunks = self._create_chunks(doc_data)
+            all_chunks.extend(chunks)
+            logger.info(f"Generated {len(chunks)} chunks for {law_code}")
+
+        if not all_chunks:
+            logger.warning("No chunks generated.")
+            return
+
+        logger.info(f"Building vector index with {len(all_chunks)} total chunks...")
+        self.vector_store.add_chunks(all_chunks)
+        
+        logger.info(f"Saving index to {self.index_dir}...")
+        self.vector_store.save(str(self.index_dir))
+        logger.success("Index build complete!")
+
+    def _create_chunks(self, doc_data: dict) -> List[LegalChunk]:
+        """Convert document pages into LegalChunk objects."""
+        chunks = []
+        law_code = doc_data.get("law_code", "UNKNOWN")
+        filename = doc_data.get("filename", "unknown.pdf")
+        
+        # Simple chunking by page for now
+        # In a real system, we'd want more sophisticated text splitting
+        for page in doc_data.get("pages", []):
+            page_text = page.get("text", "").strip()
+            if not page_text:
+                continue
+                
+            # Create a chunk for the page
+            chunk = LegalChunk(
+                law_code=law_code,
+                law_name=filename, # Use filename as law name for now
+                identifier_type="Page",
+                identifier_number=str(page.get("page_number")),
+                text=page_text,
+                chunk_id=str(uuid.uuid4()),
+                page_number=page.get("page_number"),
+                metadata={
+                    "filename": filename,
+                    "total_pages": doc_data.get("total_pages")
+                }
+            )
+            chunks.append(chunk)
+            
+        return chunks
 
 if __name__ == "__main__":
-    main()
-
+    # Support running this file directly
+    settings = Settings()
+    builder = IndexBuilder(settings)
+    builder.build_all()
