@@ -1,12 +1,17 @@
 from pathlib import Path
+import sys
 from typing import List, Optional
 import uuid
 from tqdm import tqdm
 from loguru import logger
 
+# Add src to pythonpath
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from config.settings import Settings
 from ingestion.simple_pdf_loader import SimplePDFLoader
 from indexing.vector_store import VectorStore
+from indexing.keyword_index import KeywordIndex
 from core.chunker import LegalChunk
 
 class IndexBuilder:
@@ -15,6 +20,7 @@ class IndexBuilder:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.vector_store = VectorStore(embedding_model=settings.embedding_model)
+        self.keyword_index = KeywordIndex()
         self.pdf_dir = Path("data/pdfs") # Default, could be configurable
         self.index_dir = Path(settings.index_dir)
         self.index_dir.mkdir(parents=True, exist_ok=True)
@@ -57,9 +63,11 @@ class IndexBuilder:
 
         logger.info(f"Building vector index with {len(all_chunks)} total chunks...")
         self.vector_store.add_chunks(all_chunks)
+        self.keyword_index.add_chunks(all_chunks)
         
         logger.info(f"Saving index to {self.index_dir}...")
         self.vector_store.save(str(self.index_dir))
+        self.keyword_index.save(str(self.index_dir))
         logger.success("Index build complete!")
 
     def _create_chunks(self, doc_data: dict) -> List[LegalChunk]:

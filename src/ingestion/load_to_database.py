@@ -7,11 +7,17 @@ Load PDFs to actual database (SQLite for demo).
 """
 
 import sqlite3
+import sys
 from pathlib import Path
 from typing import Dict, List
 from loguru import logger
 
+# Add src to pythonpath if running directly
+if __name__ == "__main__":
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from ingestion.simple_pdf_loader import SimplePDFLoader
+
 
 
 class LegalDocumentDB:
