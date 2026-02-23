@@ -1,4 +1,4 @@
-provider: anthropic  # anthropic | openai | gemini | local
+provider: groq
 
 anthropic:
   api_key_env: ANTHROPIC_API_KEY
@@ -20,9 +20,7 @@ local:
   model: llama3.1
   base_url: http://localhost:11434
 
-provider: groq
-
 groq:
   api_key_env: GROQ_API_KEY
-  model: llama-3.1-70b-versatile
+  model: openai/gpt-oss-20b
   max_tokens: 2000

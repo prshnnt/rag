@@ -4,6 +4,7 @@ import streamlit as st
 from pathlib import Path
 import sys
 import json
+import os
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
@@ -44,7 +45,14 @@ def load_system():
     intent_classifier = IntentClassifier()
     retriever = HybridRetriever(vector_store, keyword_index)
     reranker = LegalReranker(settings.reranker_model)
-    llm_handler = LegalLLMHandler()
+    
+    # Use key from settings, fallback to env if needed, but settings handles .env loading
+    api_key = settings.groq_api_key or os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY not found in settings or environment")
+        
+    llm_handler = LegalLLMHandler(api_key, model="openai/gpt-oss-120b") # Using a valid Groq model name
+
     validator = AnswerValidator()
     
     # Build workflow
