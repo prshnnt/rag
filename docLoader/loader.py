@@ -1,15 +1,17 @@
-"""Document loaders for the RAG agent.
+"""PDF loader for the RAG agent.
 
-Exposes PDF loading utilities (raw pages, joined text, LangChain Documents)
-and a matching LangChain @tool for agent invocation. Page numbers in the
-public API are 1-indexed.
+Public API:
+    load_pages(path, range_=[(s, e), ...], fmt="text"|"Document") -> list
+    load_pdf_file_tool(...)                                        # LangChain @tool
+
+Page numbers in the public API are 1-indexed.
 """
 
 from __future__ import annotations
 
 import os
 from enum import Enum
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 
 import pypdf
 from langchain_core.documents import Document
@@ -21,9 +23,6 @@ class PageFormat(str, Enum):
 
     TEXT = "text"
     DOCUMENT = "Document"
-
-
-# ---------- internal helpers ----------
 
 
 def _resolve_targets(
@@ -50,9 +49,6 @@ def _resolve_targets(
     return out
 
 
-# ---------- public API ----------
-
-
 def load_pages(
     pdf_path: str,
     range_: Optional[Sequence[Tuple[int, int]]] = None,
@@ -64,7 +60,7 @@ def load_pages(
         pdf_path: Path to the PDF file.
         range_: Optional list of inclusive (start, end) page-number tuples,
             1-indexed. Examples:
-                [(1, 5)]      -> pages 1..5
+                [(1, 5)]         -> pages 1..5
                 [(1, 3), (7, 9)] -> pages 1,2,3,7,8,9
             If `None`, all pages are returned.
         fmt: `PageFormat.TEXT` returns a list of `str` (one per page).
@@ -93,75 +89,11 @@ def load_pages(
         return [
             Document(
                 page_content=(reader.pages[p - 1].extract_text() or "").strip(),
-                metadata={
-                    "source": filename,
-                    "page": p,
-                    "total_pages": total,
-                },
+                metadata={"source": filename, "page": p, "total_pages": total},
             )
             for p in targets
         ]
-    return [
-        (reader.pages[p - 1].extract_text() or "").strip() for p in targets
-    ]
-
-
-# ---------- thin compatibility wrappers (kept for callers that still
-# use the old signature) ----------
-
-
-def load_pdf_as_pages(
-    pdf_path: str,
-    start_page: Optional[int] = None,
-    end_page: Optional[int] = None,
-    page_numbers: Optional[List[int]] = None,
-) -> List[Dict[str, Any]]:
-    """Dict-style output. Kept for backward compatibility."""
-    if page_numbers is not None:
-        range_: List[Tuple[int, int]] = [(p, p) for p in page_numbers]
-    elif start_page is not None or end_page is not None:
-        range_ = [(start_page or 1, end_page or len(pypdf.PdfReader(pdf_path).pages))]
-    else:
-        range_ = None
-
-    pages = load_pages(pdf_path, range_=range_, fmt=PageFormat.DOCUMENT)
-    return [
-        {"page": d.metadata["page"], "text": d.page_content, "metadata": d.metadata}
-        for d in pages
-    ]
-
-
-def load_pdf_as_text(
-    pdf_path: str,
-    start_page: Optional[int] = None,
-    end_page: Optional[int] = None,
-    page_numbers: Optional[List[int]] = None,
-) -> str:
-    if page_numbers is not None:
-        range_: List[Tuple[int, int]] = [(p, p) for p in page_numbers]
-    elif start_page is not None or end_page is not None:
-        range_ = [(start_page or 1, end_page or len(pypdf.PdfReader(pdf_path).pages))]
-    else:
-        range_ = None
-    return "\n\n".join(load_pages(pdf_path, range_=range_, fmt=PageFormat.TEXT))
-
-
-def load_pdf_as_documents(
-    pdf_path: str,
-    start_page: Optional[int] = None,
-    end_page: Optional[int] = None,
-    page_numbers: Optional[List[int]] = None,
-) -> List[Document]:
-    if page_numbers is not None:
-        range_ = [(p, p) for p in page_numbers]
-    elif start_page is not None or end_page is not None:
-        range_ = [(start_page or 1, end_page or len(pypdf.PdfReader(pdf_path).pages))]
-    else:
-        range_ = None
-    return list(load_pages(pdf_path, range_=range_, fmt=PageFormat.DOCUMENT))
-
-
-# ---------- LangChain tool ----------
+    return [(reader.pages[p - 1].extract_text() or "").strip() for p in targets]
 
 
 @tool
@@ -169,27 +101,21 @@ def load_pdf_file_tool(
     pdf_path: str,
     range_: Optional[List[Tuple[int, int]]] = None,
     fmt: str = "text",
-) -> List[Union[str, Dict[str, Any]]]:
+) -> List[Union[str, Document]]:
     """Load specific page ranges from a PDF.
 
     Args:
         pdf_path: Local path to the PDF file.
-        range_: List of inclusive (start_page, end_page) tuples,
-            1-indexed. Example: `[[1, 5]]` for pages 1-5,
-            `[[1, 3], [7, 9]]` for pages 1-3 and 7-9. If `None`, all pages.
+        range_: List of inclusive (start_page, end_page) tuples, 1-indexed.
+            Example: `[[1, 5]]` for pages 1-5, `[[1, 3], [7, 9]]` for
+            pages 1-3 and 7-9. If `None`, all pages.
         fmt: `"text"` (default) returns a list of strings.
-             `"Document"` returns a list of LangChain Document dicts.
+             `"Document"` returns a list of LangChain Document objects.
 
     Returns:
         List of pages in the requested format, sorted by page number.
     """
     try:
-        result = load_pages(pdf_path, range_=range_, fmt=fmt)
-        if fmt == "Document":
-            return [
-                {"page": d.metadata["page"], "text": d.page_content, "metadata": d.metadata}
-                for d in result
-            ]
-        return result
+        return load_pages(pdf_path, range_=range_, fmt=fmt)
     except Exception as e:
         return [f"Error loading PDF file: {e}"]
