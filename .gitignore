@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Secrets
+.env
+
+# Ruff cache
+.ruff_cache
+
+# ChromaDB runtime data
+rag/chroma.sqlite3
+rag/*/data_level0.bin
+rag/*/header.bin
+rag/*/length.bin
+rag/*/link_lists.bin
+
+# Parsed chunk cache
+docLoader/parsed_chunks.json
