@@ -63,7 +63,7 @@ class VectorStore:
     def add_documents(self, records: Sequence[Dict[str, Any]]) -> int:
         """Upsert records into the collection.
 
-        Each record must be `{"document": Document, "metadata": dict, "id": str}`.
+        Each record must be `{"document": Document, "id": str}`.
 
         Returns the number of records accepted.
         """
@@ -73,12 +73,14 @@ class VectorStore:
 
         for rec in records:
             doc = rec.get("document")
-            meta = rec.get("metadata") or {}
-            rid = rec.get("id")
             if not isinstance(doc, Document):
                 raise TypeError(f"record[{rid}] 'document' must be a Document")
+            
+            meta = doc.metadata or {}
+            rid = rec.get("id")
             if not rid:
                 raise ValueError(f"record missing 'id': {rec}")
+            
             ids.append(str(rid))
             texts.append(doc.page_content)
             # Chroma metadata values must be scalar; coerce safely.
