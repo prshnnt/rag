@@ -4,7 +4,6 @@ Builds ingestion-ready records from raw LangChain Documents:
 
     record = {
         "document":  Document,
-        "metadata":  dict,    # flattened for Chroma
         "id":        str,     # deterministic from source + page + chunk
     }
 
