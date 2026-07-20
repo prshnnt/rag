@@ -1,9 +1,17 @@
-from pydantic import BaseModel , Field
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+DocumentType = Literal["pdf", "docx", "txt", "xlsx", "pptx"]
+
 
 class DocumentMetadata(BaseModel):
-    user_id:int = Field(description="Primary key of user who uploaded document")
-    document_id:int = Field(description="a unique id of document by which it's detail are stored in db.")
-    document_name:str = Field(description="name of document file")
-    document_type:str = Field(description="type of document : pdf , docx , txt , xlsx , pptx ")
-    chunk_id:int = Field(description="a unique id of each chunk")
-    chunk_index:int = Field(description="index of the chunk by which it is stored in db to easily find the chunk before or after it.")
+    model_config = ConfigDict(frozen=True)
+
+    user_id: UUID = Field(description="Primary key of user who uploaded document")
+    document_id: UUID = Field(description="Unique id of document stored in db")
+    document_name: str = Field(description="Name of document file")
+    document_type: DocumentType = Field(description="Type of document: pdf, docx, txt, xlsx, pptx")
+    chunk_id: UUID = Field(description="Unique id of each chunk")
+    chunk_index: int = Field(ge=0, description="Index of chunk in document for ordering")
