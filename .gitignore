@@ -24,3 +24,11 @@ rag/*/link_lists.bin
 
 # Parsed chunk cache
 docLoader/parsed_chunks.json
+
+# SQLite databases
+*.db
+*.sqlite3
+*.sqlite
+
+# Agent sandbox (filesystem backend root)
+sandbox/
