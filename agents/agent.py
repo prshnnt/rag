@@ -1,6 +1,6 @@
 import os
 import uuid
-from typing import Optional, Literal, AsyncGenerator
+from typing import Optional, Literal, Dict, Any, AsyncGenerator
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ from deepagents.backends import FilesystemBackend
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.utilities import SQLDatabase
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
+from langgraph.types import Command
 from langchain.messages import HumanMessage
 
 load_dotenv()
@@ -30,11 +31,14 @@ def get_tools() -> list:
 
 
 # Real lifecycle of a single turn, in order:
-#   start -> (message_start -> content* -> message_end | tool_start -> tool_end)* -> end
+#   start -> (message_start -> content* -> message_end | tool_start -> tool_end)*
+#     -> end | approval_required
 # "error" can happen at any point instead of the terminal "end".
+# "approval_required" means execution is PAUSED (state is checkpointed) and the
+# turn is not over until the caller resumes it via `aresume()`.
 StreamType = Literal[
     "start", "message_start", "content", "message_end",
-    "tool_start", "tool_end", "end", "error",
+    "tool_start", "tool_end", "approval_required", "end", "error",
 ]
 
 
@@ -46,6 +50,23 @@ class StreamChunk(BaseModel):
     content: Optional[str] = Field(None, description="Text content for content/end chunks")
     tool: Optional[str] = Field(None, description="Tool name for tool_start/tool_end chunks")
     skill: Optional[str] = Field(None, description="Skill being invoked, if any")
+    data: Optional[Dict[str, Any]] = Field(
+        None,
+        description=(
+            "Structured payload for approval_required chunks: "
+            "{'action_requests': [...], 'review_configs': [...]}"
+        ),
+    )
+
+
+# Tools that require a human decision before they're allowed to execute.
+# See https://docs.langchain.com/oss/python/deepagents/human-in-the-loop
+DEFAULT_INTERRUPT_ON: Dict[str, Any] = {
+    # sql_db_query can run arbitrary SQL (including writes) -> always gate it.
+    "sql_db_query": {"allowed_decisions": ["approve", "edit", "reject"]},
+    # Schema/table-listing/query-checking tools are read-only and safe to
+    # leave unattended; deepagents treats an absent key as "no interrupt".
+}
 
 
 class MainAgent:
@@ -67,7 +88,11 @@ class MainAgent:
         self.checkpointer = checkpointer
 
     @classmethod
-    async def create(cls, redis_url: str = "redis://localhost:6379") -> "MainAgent":
+    async def create(
+        cls,
+        redis_url: str = "redis://localhost:6379",
+        interrupt_on: Optional[Dict[str, Any]] = None,
+    ) -> "MainAgent":
         model = get_model()
 
         base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -90,6 +115,9 @@ class MainAgent:
             subagents=[],
             memory=["./AGENTS.md"],
             checkpointer=checkpointer,
+            # Human-in-the-loop: pause before running gated tools until a
+            # human calls MainAgent.aresume() with approve/edit/reject.
+            interrupt_on=DEFAULT_INTERRUPT_ON if interrupt_on is None else interrupt_on,
         )
 
         return cls(model, agent, redis_cm, checkpointer)
@@ -100,19 +128,32 @@ class MainAgent:
             await self._redis_cm.__aexit__(None, None, None)
             self._redis_cm = None
 
-    async def astream(
-        self, message: str, thread_id: str = "default"
-    ) -> AsyncGenerator[StreamChunk, None]:
-        yield StreamChunk(type="start", thread_id=thread_id)
+    async def _pending_interrupts(self, config: dict):
+        """Return any interrupts left un-resolved after the last run, if any."""
+        state = await self.agent.aget_state(config)
+        interrupts = getattr(state, "interrupts", None)
+        if interrupts:
+            return interrupts
+        # Older langgraph versions surface interrupts per-task instead of
+        # top-level; fall back to flattening those.
+        return tuple(
+            i
+            for task in getattr(state, "tasks", ())
+            for i in getattr(task, "interrupts", ())
+        )
 
+    async def _run(self, graph_input, thread_id: str) -> AsyncGenerator[StreamChunk, None]:
+        """Drive one graph execution (fresh message OR a Command(resume=...))
+        and yield StreamChunks for it, ending in exactly one of:
+        'end' (turn finished), 'approval_required' (paused, needs a human
+        decision), or 'error'.
+        """
         config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
         full_response = ""
 
         try:
             async for event in self.agent.astream_events(
-                {"messages": [HumanMessage(content=message)]},
-                config=config,
-                version="v2",
+                graph_input, config=config, version="v2"
             ):
                 event_type = event.get("event", "")
                 data = event.get("data", {})
@@ -151,7 +192,43 @@ class MainAgent:
             yield StreamChunk(type="error", thread_id=thread_id, content=str(e))
             return
 
+        # astream_events finishing "normally" doesn't mean the turn is done --
+        # if a gated tool was called, the graph is paused and checkpointed
+        # rather than errored. Check for that before declaring "end".
+        interrupts = await self._pending_interrupts(config)
+        if interrupts:
+            yield StreamChunk(
+                type="approval_required",
+                thread_id=thread_id,
+                data=interrupts[0].value,
+            )
+            return
+
         yield StreamChunk(type="end", thread_id=thread_id, content=full_response)
+
+    async def astream(
+        self, message: str, thread_id: str = "default"
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """Start (or continue) a conversation turn with a new user message."""
+        yield StreamChunk(type="start", thread_id=thread_id)
+        async for chunk in self._run({"messages": [HumanMessage(content=message)]}, thread_id):
+            yield chunk
+
+    async def aresume(
+        self, decisions: list, thread_id: str = "default"
+    ) -> AsyncGenerator[StreamChunk, None]:
+        """
+        Resume a turn paused by an 'approval_required' chunk.
+
+        `decisions` must have one entry per action_request from that chunk,
+        in the same order, each one of:
+          {"type": "approve"}
+          {"type": "reject"}
+          {"type": "edit", "edited_action": {"name": ..., "args": {...}}}
+        """
+        yield StreamChunk(type="start", thread_id=thread_id)
+        async for chunk in self._run(Command(resume={"decisions": decisions}), thread_id):
+            yield chunk
 
 
 async def build_agent() -> MainAgent:
