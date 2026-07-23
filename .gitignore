@@ -29,3 +29,6 @@ docLoader/parsed_chunks.json
 *.db
 *.sqlite3
 *.sqlite
+
+# Node modules (sandbox scripts)
+node_modules/
