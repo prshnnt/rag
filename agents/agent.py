@@ -8,11 +8,13 @@ from pydantic import BaseModel, Field
 from deepagents import create_deep_agent
 from langchain_ollama import ChatOllama
 from deepagents.backends import FilesystemBackend
+from deepagents.middleware import FilesystemMiddleware
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.utilities import SQLDatabase
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.types import Command
 from langchain.messages import HumanMessage
+from tools.websearch import websearch
 
 load_dotenv()
 
@@ -27,7 +29,7 @@ def get_model(model_name: str = "gpt-oss:120b") -> ChatOllama:
 
 def get_tools() -> list:
     """Extra (non-SQL) tools for the agent. Add custom tools here."""
-    return []
+    return [websearch]
 
 
 # Real lifecycle of a single turn, in order:
@@ -111,7 +113,10 @@ class MainAgent:
             model=model,
             tools=tools,
             backend=FilesystemBackend(root_dir="./sandbox/", virtual_mode=True),
-            skills=["./skills/"],
+            middleware=[
+                
+            ],
+            skills=["./skills/examples","./skills/public"],
             subagents=[],
             memory=["./AGENTS.md"],
             checkpointer=checkpointer,
