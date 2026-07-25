@@ -113,9 +113,6 @@ class MainAgent:
             model=model,
             tools=tools,
             backend=FilesystemBackend(root_dir="./sandbox/", virtual_mode=True),
-            middleware=[
-                
-            ],
             skills=["./skills/examples","./skills/public"],
             subagents=[],
             memory=["./AGENTS.md"],
