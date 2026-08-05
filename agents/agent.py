@@ -15,6 +15,7 @@ from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.types import Command
 from langchain.messages import HumanMessage
 from tools.websearch import websearch
+from vectorstore.tools import list_documents , vector_search
 
 load_dotenv()
 
@@ -29,7 +30,7 @@ def get_model(model_name: str = "gpt-oss:120b") -> ChatOllama:
 
 def get_tools() -> list:
     """Extra (non-SQL) tools for the agent. Add custom tools here."""
-    return [websearch]
+    return [websearch , list_documents , vector_search]
 
 
 # Real lifecycle of a single turn, in order:
@@ -66,6 +67,7 @@ class StreamChunk(BaseModel):
 DEFAULT_INTERRUPT_ON: Dict[str, Any] = {
     # sql_db_query can run arbitrary SQL (including writes) -> always gate it.
     "sql_db_query": {"allowed_decisions": ["approve", "edit", "reject"]},
+    "websearch": {"allowed_decisions":["approve","reject"]}
     # Schema/table-listing/query-checking tools are read-only and safe to
     # leave unattended; deepagents treats an absent key as "no interrupt".
 }
