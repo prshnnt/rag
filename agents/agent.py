@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from deepagents import create_deep_agent
 from langchain_ollama import ChatOllama
-from deepagents.backends import FilesystemBackend
+from deepagents.backends import FilesystemBackend , CompositeBackend
 from deepagents.middleware import FilesystemMiddleware
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.utilities import SQLDatabase
