@@ -32,3 +32,4 @@ docLoader/parsed_chunks.json
 
 # Node modules (sandbox scripts)
 node_modules/
+output/*
