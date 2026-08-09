@@ -33,3 +33,5 @@ docLoader/parsed_chunks.json
 # Node modules (sandbox scripts)
 node_modules/
 output/*
+sandbox/conversation_history
+sandbox/large_tool_results
