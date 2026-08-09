@@ -39,7 +39,7 @@ There is no test suite and no linter wired up in `pyproject.toml`. `uv.lock` is 
 ### `agents/agent.py` — Agent
 - `get_model()` → `ChatOllama(model="gpt-oss:120b", base_url="https://api.ollama.com", temperature=0)`.
 - DB: `SQLDatabase.from_uri(f"sqlite:///{dir_of_agent.py}/chinook.db", sample_rows_in_table_info=3)`.
-- Tools: `SQLDatabaseToolkit(db, llm).get_tools() + get_tools()`. `get_tools()` is the extension point for non-SQL tools — currently returns `[websearch]` (from `tools/websearch.py`).
+- Tools: `SQLDatabaseToolkit(db, llm).get_tools() + get_tools()`. `get_tools()` is the extension point for non-SQL tools — currently returns `[websearch, list_documents, vector_search]` (websearch via `tools/websearch.py`; `list_documents`/`vector_search` come from `vectorstore/tools.py`).
 - Checkpointer: `AsyncRedisSaver.from_conn_string(redis_url)` entered as an async context manager + `await checkpointer.asetup()`.
 - `create_deep_agent(...)` with:
   - `backend=FilesystemBackend(root_dir="./sandbox/", virtual_mode=True)`
@@ -57,7 +57,7 @@ Per turn: `start` → `(message_start → content* → message_end | tool_start 
 `StreamChunk` (pydantic): `thread_id`, `type`, `content?`, `tool?`, `skill?`, `data?`. For `approval_required`, `data` carries `{"action_requests": [...], "review_configs": [...]}`.
 
 ### Human-in-the-loop
-`DEFAULT_INTERRUPT_ON` only gates `sql_db_query` (`["approve", "edit", "reject"]`). The other SQL toolkit tools (`sql_db_list_tables`, `sql_db_schema`, `sql_db_query_checker`) are read-only and run unguarded. `MainAgent._pending_interrupts(config)` reads `state.interrupts`, with a fallback that flattens per-task interrupts for older langgraph.
+`DEFAULT_INTERRUPT_ON` gates `sql_db_query` (`["approve", "edit", "reject"]`) and `websearch` (`["approve", "reject"]`). The other SQL toolkit tools (`sql_db_list_tables`, `sql_db_schema`, `sql_db_query_checker`) are read-only and run unguarded. `MainAgent._pending_interrupts(config)` reads `state.interrupts`, with a fallback that flattens per-task interrupts for older langgraph.
 
 Decision shapes:
 - `{"type": "approve"}`
