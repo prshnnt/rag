@@ -14,8 +14,8 @@ from langchain_community.utilities import SQLDatabase
 from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.types import Command
 from langchain.messages import HumanMessage
-from tools.websearch import websearch
-from vectorstore.tools import list_documents , vector_search
+from agents.subagents.web_researcher import web_researcher
+from agents.subagents.vector_researcher import vector_researcher
 
 load_dotenv()
 
@@ -29,8 +29,18 @@ def get_model(model_name: str = "gpt-oss:120b") -> ChatOllama:
 
 
 def get_tools() -> list:
-    """Extra (non-SQL) tools for the agent. Add custom tools here."""
-    return [websearch , list_documents , vector_search]
+    """Tools exposed directly to the main agent.
+
+    Web search and vectorstore retrieval are NOT exposed here — they are
+    reached via the web-researcher / vector-researcher subagents. Keeping
+    them off the main agent forces delegation instead of guessing.
+    """
+    return []
+
+
+def get_subagents() -> list:
+    """Subagents the main agent can delegate to via the `task` tool."""
+    return [web_researcher, vector_researcher]
 
 
 # Real lifecycle of a single turn, in order:
@@ -116,7 +126,7 @@ class MainAgent:
             tools=tools,
             backend=FilesystemBackend(root_dir="./sandbox/", virtual_mode=True),
             skills=["./skills/examples","./skills/public"],
-            subagents=[],
+            subagents=get_subagents(),
             memory=["./AGENTS.md"],
             checkpointer=checkpointer,
             # Human-in-the-loop: pause before running gated tools until a
