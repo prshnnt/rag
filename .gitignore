@@ -29,6 +29,8 @@ docLoader/parsed_chunks.json
 *.db
 *.sqlite3
 *.sqlite
+chroma/
+docs/
 
 # Node modules (sandbox scripts)
 node_modules/
