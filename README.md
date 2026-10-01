@@ -203,7 +203,6 @@ Redis URL default: `redis://localhost:6379`. Pass override to `MainAgent.create(
   - `889f338` feat: thread-scoped state, message_start/end events, ipybox sandbox
   - `e2d04bf` refactor: async agent with redis checkpointer + thread-aware cli
   - `0728d1c` (skills added)
-  - `90c2270` chore: ignore .db files and sandbox directory
 
 ## Known gaps / TODO signals
 
