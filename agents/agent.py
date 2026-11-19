@@ -16,14 +16,13 @@ from langgraph.types import Command
 from langchain.messages import HumanMessage
 from agents.subagents.web_researcher import web_researcher
 from agents.subagents.vector_researcher import vector_researcher
-
+from langchain_groq import ChatGroq
 load_dotenv()
 
 
-def get_model(model_name: str = "gpt-oss:120b") -> ChatOllama:
-    return ChatOllama(
+def get_model(model_name: str = "qwen/qwen3.8-27b"):
+    return ChatGroq(
         model=model_name,
-        base_url="https://api.ollama.com",
         temperature=0,
     )
 
