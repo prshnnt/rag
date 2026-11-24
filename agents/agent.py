@@ -16,16 +16,8 @@ from langgraph.types import Command
 from langchain.messages import HumanMessage
 from agents.subagents.web_researcher import web_researcher
 from agents.subagents.vector_researcher import vector_researcher
-from langchain_groq import ChatGroq
+from config import get_model , Provider
 load_dotenv()
-
-
-def get_model(model_name: str = "qwen/qwen3.8-27b"):
-    return ChatGroq(
-        model=model_name,
-        temperature=0,
-    )
-
 
 def get_tools() -> list:
     """Tools exposed directly to the main agent.
